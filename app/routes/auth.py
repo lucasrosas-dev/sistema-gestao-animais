@@ -16,6 +16,15 @@ router = APIRouter()
 login_limiter = LoginAttemptLimiter()
 
 
+def login_destination(user: User, requested_url: str) -> str:
+    destination = safe_next_url(requested_url)
+    if user.role != "Administrador" and (
+        destination == "/admin" or destination.startswith("/admin/")
+    ):
+        return "/"
+    return destination
+
+
 @router.get("/login", response_class=HTMLResponse)
 def login_form(request: Request, next: str = "/"):
     if request.session.get("user_id"):
@@ -53,7 +62,7 @@ def login(
         "session_version": user.session_version,
         "must_change_password": bool(user.must_change_password),
     })
-    destination = "/conta/senha" if user.must_change_password else safe_next_url(next)
+    destination = "/conta/senha" if user.must_change_password else login_destination(user, next)
     return RedirectResponse(destination, status_code=303)
 
 
@@ -101,4 +110,4 @@ def change_password(
     db.commit()
     request.session.clear()
     add_flash(request, "Senha alterada. Entre novamente com a nova senha.", "success")
-    return RedirectResponse("/login", status_code=303)
+    return RedirectResponse("/login?next=/", status_code=303)

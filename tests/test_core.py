@@ -66,9 +66,69 @@ def test_change_password_invalidates_session(client):
     page = client.get("/conta/senha")
     response = client.post("/conta/senha", data={"current_password": "test-password-123", "new_password": "nova-senha-123", "confirm_password": "nova-senha-123", "csrf_token": hidden(page.text, "csrf_token")}, follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == "/login"
+    assert response.headers["location"] == "/login?next=/"
     assert client.get("/", follow_redirects=False).status_code == 303
     assert login(client, password="nova-senha-123").status_code == 303
+
+
+def test_operator_is_redirected_to_dashboard_after_forced_password_change(client):
+    with SessionLocal() as db:
+        user = User(
+            username="operador",
+            name="Operador",
+            role="Operador",
+            password_hash=hash_password("senha-temporaria-123"),
+            is_active=True,
+            must_change_password=True,
+            session_version=1,
+        )
+        db.add(user)
+        db.commit()
+
+    login_page = client.get("/login?next=/admin/usuarios")
+    first_login = client.post(
+        "/login",
+        data={
+            "username": "operador",
+            "password": "senha-temporaria-123",
+            "csrf_token": hidden(login_page.text, "csrf_token"),
+            "next": "/admin/usuarios",
+        },
+        follow_redirects=False,
+    )
+    assert first_login.status_code == 303
+    assert first_login.headers["location"] == "/conta/senha"
+
+    password_page = client.get("/conta/senha")
+    changed = client.post(
+        "/conta/senha",
+        data={
+            "current_password": "senha-temporaria-123",
+            "new_password": "senha-definitiva-123",
+            "confirm_password": "senha-definitiva-123",
+            "csrf_token": hidden(password_page.text, "csrf_token"),
+        },
+        follow_redirects=False,
+    )
+    assert changed.status_code == 303
+    assert changed.headers["location"] == "/login?next=/"
+
+    relogin_page = client.get("/login?next=/admin/usuarios")
+    relogin = client.post(
+        "/login",
+        data={
+            "username": "operador",
+            "password": "senha-definitiva-123",
+            "csrf_token": hidden(relogin_page.text, "csrf_token"),
+            "next": "/admin/usuarios",
+        },
+        follow_redirects=False,
+    )
+    assert relogin.status_code == 303
+    assert relogin.headers["location"] == "/"
+    dashboard = client.get("/")
+    assert dashboard.status_code == 200
+    assert "Acesso negado" not in dashboard.text
 
 
 def test_password_policy_rejects_login_as_password(client):
