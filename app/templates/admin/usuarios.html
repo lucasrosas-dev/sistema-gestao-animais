@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Usuários{% endblock %}
+{% block breadcrumb_items %}<span>›</span><span>Administração</span><span>›</span><span>Usuários</span>{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Usuários e perfis</h1><p>Administre acessos de Administrador, Operador e Consulta.</p></div><a class="button" href="/admin/usuarios/novo">Novo usuário</a></div>
+<section class="card table-card">
+{% if usuarios %}<div class="table-wrap"><table><thead><tr><th>Nome / login</th><th>Perfil</th><th>Situação</th><th>Último acesso</th><th>Criação</th><th class="no-print">Ações</th></tr></thead><tbody>
+{% for usuario in usuarios %}<tr><td><strong>{{ usuario.name or usuario.username }}</strong><span class="table-subtitle">{{ usuario.username }}</span></td><td><span class="badge info">{{ usuario.role }}</span></td><td><span class="badge {{ 'success' if usuario.is_active else 'danger' }}">{{ 'Ativo' if usuario.is_active else 'Inativo' }}</span></td><td>{{ usuario.last_login_at|datetime_br }}</td><td>{{ usuario.created_at|datetime_br }}</td><td class="no-print"><div class="row-actions"><a class="button compact secondary" href="/admin/usuarios/{{ usuario.id }}/editar">Editar</a><form method="post" action="/admin/usuarios/{{ usuario.id }}/redefinir-senha" data-confirm="Redefinir a senha e exigir alteração no próximo acesso?"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button compact ghost" type="submit">Redefinir senha</button></form></div></td></tr>{% endfor %}
+</tbody></table></div>{% else %}<div class="empty-state"><strong>Nenhum usuário cadastrado</strong></div>{% endif %}
+</section>
+<div class="card info-card"><h2>Perfis</h2><div class="grid-three"><div><strong>Administrador</strong><p>Acesso completo, usuários, auditoria e operações administrativas.</p></div><div><strong>Operador</strong><p>Cadastra e edita animais, produção, eventos, custos e receitas.</p></div><div><strong>Consulta</strong><p>Somente leitura e geração de relatórios.</p></div></div></div>
+{% endblock %}

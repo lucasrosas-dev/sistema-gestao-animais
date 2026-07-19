@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% set editing = usuario is not none %}
+{% block title %}{{ 'Editar usuário' if editing else 'Novo usuário' }}{% endblock %}
+{% block breadcrumb_items %}<span>›</span><a href="/admin/usuarios">Usuários</a><span>›</span><span>{{ 'Editar' if editing else 'Novo' }}</span>{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>{{ 'Editar usuário' if editing else 'Novo usuário' }}</h1><p>Defina identificação, perfil e condição de acesso.</p></div></div>
+{% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+<form class="card form-card prevent-double-submit" method="post" action="{{ '/admin/usuarios/' ~ usuario.id ~ '/editar' if editing else '/admin/usuarios/novo' }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<section class="form-section"><div class="form-grid">
+<label>Nome<input name="name" maxlength="120" value="{{ form_data.get('name', usuario.name if editing and usuario.name else '') }}"></label>
+{% if not editing %}<label>Login *<input name="username" maxlength="80" required autocomplete="off" value="{{ form_data.get('username','') }}"></label>{% else %}<label>Login<input value="{{ usuario.username }}" disabled></label>{% endif %}
+<label>Perfil<select name="role">{% set selected_role = form_data.get('role', usuario.role if editing else 'Consulta') %}{% for item in roles %}<option value="{{ item }}" {{ 'selected' if selected_role == item else '' }}>{{ item }}</option>{% endfor %}</select></label>
+{% if editing %}<label class="check-inline"><input type="checkbox" name="is_active" value="1" {{ 'checked' if usuario.is_active else '' }}> Usuário ativo</label>{% endif %}
+{% if not editing %}<label>Senha inicial *<input type="password" name="password" minlength="8" required autocomplete="new-password"></label><label>Confirmar senha *<input type="password" name="confirm_password" minlength="8" required autocomplete="new-password"></label>{% endif %}
+</div></section>
+<div class="form-actions"><a class="button ghost" href="/admin/usuarios">Cancelar</a><button class="button" type="submit">Salvar</button></div>
+</form>
+{% endblock %}

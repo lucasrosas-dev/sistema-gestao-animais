@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% set editing = producao is not none %}
+{% block title %}{{ 'Editar produção' if editing else 'Nova produção' }}{% endblock %}
+{% block breadcrumb_items %}<span>›</span><a href="/producao">Produção</a><span>›</span><span>{{ 'Editar' if editing else 'Nova' }}</span>{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>{{ 'Editar produção' if editing else 'Nova produção' }}</h1><p>Registre a quantidade efetivamente produzida. A produção não gera receita automaticamente.</p></div></div>
+{% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+<form class="card form-card prevent-double-submit" method="post" action="{{ '/producao/' ~ producao.id ~ '/editar' if editing else '/producao/nova' }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="form_token" value="{{ form_token }}">
+<section class="form-section"><div class="form-grid">
+  <label>Animal *<select class="{{ 'invalid' if field_errors.animal_id else '' }}" name="animal_id" required><option value="">Selecione</option>{% set selected = form_data.get('animal_id', producao.animal_id if editing else '')|string %}{% for animal in animais %}<option value="{{ animal.id }}" {{ 'selected' if selected == animal.id|string else '' }}>{{ animal.identificacao }} · {{ animal.status }}</option>{% endfor %}</select>{% if field_errors.animal_id %}<span class="field-error">{{ field_errors.animal_id }}</span>{% endif %}</label>
+  <label>Data *<input class="{{ 'invalid' if field_errors.data_registro else '' }}" type="date" name="data_registro" required value="{{ form_data.get('data_registro', producao.data_registro.isoformat() if editing else '') }}">{% if field_errors.data_registro %}<span class="field-error">{{ field_errors.data_registro }}</span>{% endif %}</label>
+  <label>Quantidade em litros *<input class="{{ 'invalid' if field_errors.quantidade_litros else '' }}" name="quantidade_litros" inputmode="decimal" required value="{{ form_data.get('quantidade_litros', producao.quantidade_litros if editing else '') }}">{% if field_errors.quantidade_litros %}<span class="field-error">{{ field_errors.quantidade_litros }}</span>{% endif %}</label>
+  <label>Valor por litro<input class="{{ 'invalid' if field_errors.valor_litro else '' }}" name="valor_litro" inputmode="decimal" value="{{ form_data.get('valor_litro', producao.valor_litro if editing and producao.valor_litro is not none else '') }}"><small>Informação estimativa; não substitui o registro de venda.</small>{% if field_errors.valor_litro %}<span class="field-error">{{ field_errors.valor_litro }}</span>{% endif %}</label>
+  <label class="full">Observações<textarea name="observacoes" rows="4">{{ form_data.get('observacoes', producao.observacoes if editing and producao.observacoes else '') }}</textarea></label>
+</div></section>
+<div class="form-actions"><a class="button ghost" href="/producao">Cancelar</a><button class="button" type="submit">{{ 'Salvar alterações' if editing else 'Registrar produção' }}</button></div>
+</form>
+{% endblock %}

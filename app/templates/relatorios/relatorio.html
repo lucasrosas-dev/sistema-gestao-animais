@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ report.title }}{% endblock %}
+{% block breadcrumb_items %}<span>›</span><a href="/relatorios">Relatórios</a><span>›</span><span>{{ report.title }}</span>{% endblock %}
+{% block content %}
+<div class="page-header print-header"><div><h1>{{ report.title }}</h1><p>{{ report.description }}</p></div><div class="actions no-print"><a class="button secondary" href="{{ request.url.path }}/xlsx?{{ request.url.query }}">Excel</a><a class="button ghost" href="{{ request.url.path }}/csv?{{ request.url.query }}">CSV</a><a class="button ghost" href="{{ request.url.path }}/pdf?{{ request.url.query }}">PDF</a><button class="button ghost" type="button" onclick="window.print()">Imprimir</button></div></div>
+<form class="filter-card no-print" method="get">
+  {% if report_name == 'mensal' %}
+  <label>Ano<input type="number" name="ano" min="2000" max="2100" value="{{ ano }}"></label>
+  {% else %}
+  <label>Período<select name="preset"><option value="all" {{ 'selected' if preset == 'all' else '' }}>Todo o período</option><option value="current_month" {{ 'selected' if preset == 'current_month' else '' }}>Mês atual</option><option value="previous_month" {{ 'selected' if preset == 'previous_month' else '' }}>Mês anterior</option><option value="current_year" {{ 'selected' if preset == 'current_year' else '' }}>Ano atual</option><option value="last_3" {{ 'selected' if preset == 'last_3' else '' }}>Últimos 3 meses</option><option value="last_6" {{ 'selected' if preset == 'last_6' else '' }}>Últimos 6 meses</option><option value="last_12" {{ 'selected' if preset == 'last_12' else '' }}>Últimos 12 meses</option><option value="custom" {{ 'selected' if preset == 'custom' else '' }}>Personalizado</option></select></label>
+  <label>Data inicial<input type="date" name="data_inicio" value="{{ data_inicio }}"></label>
+  <label>Data final<input type="date" name="data_fim" value="{{ data_fim }}"></label>
+  {% endif %}
+  <label>Regime<select name="regime"><option value="competencia" {{ 'selected' if regime == 'competencia' else '' }}>Competência</option><option value="caixa" {{ 'selected' if regime == 'caixa' else '' }}>Caixa</option></select></label>
+  {% if report_name in ['animais','producao-custos'] %}<label class="check-inline"><input type="checkbox" name="mostrar_todos" value="1" {{ 'checked' if mostrar_todos == '1' else '' }}> Mostrar todos os animais</label>{% endif %}
+  <div class="filter-actions"><button class="button" type="submit">Aplicar</button><a class="button ghost" href="/relatorios/{{ report_name }}">Limpar</a></div>
+</form>
+<div class="period-summary print-only-block"><strong>Período:</strong> {{ ano if report_name == 'mensal' else period.label }} · <strong>Regime:</strong> {{ 'Caixa' if regime == 'caixa' else 'Competência' }} · <strong>Gerado em:</strong> <span data-current-datetime></span></div>
+{% if report.summary %}
+<section class="metric-grid report-summary-grid">
+{% for label, value in report.summary %}<article class="metric-card"><span>{{ label }}</span><strong>{{ value }}</strong></article>{% endfor %}
+</section>
+{% endif %}
+{% if report.chart %}
+<section class="card chart-card"><div class="section-title"><div><h2>Visualização</h2><p>Os valores seguem os mesmos critérios da tabela.</p></div></div><div class="chart-scroll"><canvas id="reportChart" class="chart chart-financial"></canvas></div><div id="reportChartLegend" class="chart-legend"></div></section>
+{% endif %}
+<section class="card table-card">
+  <div class="section-title"><div><h2>Detalhamento</h2><p>{{ report.raw_rows|length }} registro(s).</p></div></div>
+  {% if report.display_rows %}
+  <div class="table-wrap"><table><thead><tr>{% for header in report.headers %}<th>{{ header }}</th>{% endfor %}</tr></thead><tbody>{% for row in report.display_rows %}<tr>{% for value in row %}<td>{{ value }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+  {% else %}<div class="empty-state"><strong>Nenhum dado no período</strong><p>Altere os filtros ou registre movimentações para compor o relatório.</p></div>{% endif %}
+</section>
+{% endblock %}
+{% block scripts %}
+{% if report.chart %}<script>
+const reportChartData = {{ report.chart|tojson }};
+if (reportChartData.type === 'scatter') {
+  drawScatterChart('reportChart', reportChartData.points || [], 'Produção (L)', 'Custo atribuído (R$)');
+} else {
+  drawSeriesChart('reportChart', reportChartData.labels || [], reportChartData.series || [], 'reportChartLegend');
+}
+</script>{% endif %}
+{% endblock %}

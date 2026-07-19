@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Novo evento{% endblock %}
+{% block breadcrumb_items %}<span>›</span><a href="/animais">Animais</a><span>›</span><a href="/animais/{{ animal.id }}">{{ animal.codigo }}</a><span>›</span><span>Novo evento</span>{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Registrar evento</h1><p>{{ animal.identificacao }}</p></div></div>
+<form class="card form-card prevent-double-submit" method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="form_token" value="{{ form_token }}">
+<section class="form-section"><div class="form-grid">
+<label>Data *<input class="{{ 'invalid' if field_errors.data else '' }}" type="date" name="data" required value="{{ form_data.get('data','') }}">{% if field_errors.data %}<span class="field-error">{{ field_errors.data }}</span>{% endif %}</label>
+<label>Grupo *<select id="eventGroup" name="grupo" class="{{ 'invalid' if field_errors.grupo else '' }}" required><option value="">Selecione</option>{% for group in grupos %}<option value="{{ group }}" {{ 'selected' if form_data.get('grupo') == group else '' }}>{{ group }}</option>{% endfor %}</select>{% if field_errors.grupo %}<span class="field-error">{{ field_errors.grupo }}</span>{% endif %}</label>
+<label>Tipo *<select id="eventType" name="tipo" class="{{ 'invalid' if field_errors.tipo else '' }}" required data-selected="{{ form_data.get('tipo','') }}"><option value="">Selecione o grupo</option></select>{% if field_errors.tipo %}<span class="field-error">{{ field_errors.tipo }}</span>{% endif %}</label>
+<label>Título *<input class="{{ 'invalid' if field_errors.titulo else '' }}" name="titulo" maxlength="160" required value="{{ form_data.get('titulo','') }}">{% if field_errors.titulo %}<span class="field-error">{{ field_errors.titulo }}</span>{% endif %}</label>
+<label class="full">Descrição<textarea name="descricao" rows="4">{{ form_data.get('descricao','') }}</textarea></label>
+<label class="full">Observações<textarea name="observacoes" rows="3">{{ form_data.get('observacoes','') }}</textarea></label>
+</div></section>
+<section class="form-section conditional-section" id="birthSection" hidden><h2>Descendentes do parto</h2><p class="help-text">Opcional. Informe uma linha por descendente no formato <code>CODIGO;NOME;SEXO</code>. Exemplo: <code>B-001;Estrela;Fêmea</code>.</p><div class="form-grid"><label>Pai conhecido<select name="pai_id"><option value="">Não informado</option>{% for item in pais %}<option value="{{ item.id }}" {{ 'selected' if form_data.get('pai_id')|string == item.id|string else '' }}>{{ item.identificacao }}</option>{% endfor %}</select></label><label class="full">Descendentes<textarea name="descendentes" rows="5" placeholder="B-001;Estrela;Fêmea">{{ form_data.get('descendentes','') }}</textarea></label></div></section>
+<div class="form-actions"><a class="button ghost" href="/animais/{{ animal.id }}">Cancelar</a><button class="button" type="submit">Registrar evento</button></div>
+</form>
+{% endblock %}
+{% block scripts %}<script>initEventForm({{ grupos|tojson }});</script>{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Painel{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Painel gerencial</h1><p>Indicadores produtivos e financeiros do período selecionado.</p></div>
+  <div class="actions no-print"><a class="button" href="/producao/nova">Nova produção</a><a class="button secondary" href="/relatorios">Relatórios</a></div>
+</div>
+{% for error in errors %}<div class="alert error">{{ error }}</div>{% endfor %}
+<form class="filter-card no-print" method="get">
+  <label>Período
+    <select name="preset" id="periodPreset">
+      <option value="all" {{ 'selected' if preset == 'all' else '' }}>Todo o período</option>
+      <option value="current_month" {{ 'selected' if preset == 'current_month' else '' }}>Mês atual</option>
+      <option value="previous_month" {{ 'selected' if preset == 'previous_month' else '' }}>Mês anterior</option>
+      <option value="current_year" {{ 'selected' if preset == 'current_year' else '' }}>Ano atual</option>
+      <option value="last_3" {{ 'selected' if preset == 'last_3' else '' }}>Últimos 3 meses</option>
+      <option value="last_6" {{ 'selected' if preset == 'last_6' else '' }}>Últimos 6 meses</option>
+      <option value="last_12" {{ 'selected' if preset == 'last_12' else '' }}>Últimos 12 meses</option>
+      <option value="custom" {{ 'selected' if preset == 'custom' else '' }}>Personalizado</option>
+    </select>
+  </label>
+  <label>Data inicial<input type="date" name="data_inicio" value="{{ data_inicio }}"></label>
+  <label>Data final<input type="date" name="data_fim" value="{{ data_fim }}"></label>
+  <label>Regime
+    <select name="regime"><option value="competencia" {{ 'selected' if regime == 'competencia' else '' }}>Competência</option><option value="caixa" {{ 'selected' if regime == 'caixa' else '' }}>Caixa</option></select>
+  </label>
+  <label class="check-inline"><input type="checkbox" name="comparar" value="1" {{ 'checked' if comparar == '1' else '' }}> Comparar período anterior</label>
+  <div class="filter-actions"><button class="button" type="submit">Aplicar</button><a class="button ghost" href="/">Limpar</a></div>
+</form>
+<div class="period-summary"><strong>Período:</strong> {{ period.label }} · <strong>Regime:</strong> {{ 'Caixa' if regime == 'caixa' else 'Competência' }}</div>
+
+<section class="metric-grid metric-grid-responsive">
+  <article class="metric-card"><span>Animais ativos</span><strong>{{ metrics.animals_active }}</strong><small>situação atual</small></article>
+  <article class="metric-card"><span>Em produção</span><strong>{{ metrics.animals_in_production }}</strong><small>com lançamento no período</small></article>
+  <article class="metric-card"><span>Produção total</span><strong>{{ metrics.production_total|liters_br }}</strong><small>{{ period.label }}</small></article>
+  <article class="metric-card"><span>Média diária</span><strong>{{ metrics.daily_average|liters_br if metrics.daily_average is not none else 'Não calculável' }}</strong><small>dias do período</small></article>
+  <article class="metric-card"><span>Média por animal</span><strong>{{ metrics.average_per_producing_animal|liters_br if metrics.average_per_producing_animal is not none else 'Não calculável' }}</strong><small>animais em produção</small></article>
+  <article class="metric-card"><span>Litros vendidos</span><strong>{{ metrics.liters_sold|liters_br }}</strong><small>receitas de leite</small></article>
+  <article class="metric-card"><span>Diferença produção/venda</span><strong>{{ metrics.production_sales_difference|liters_br }}</strong><small>não representa estoque validado</small></article>
+  <article class="metric-card"><span>Receita total</span><strong>{{ metrics.revenue_total|currency_br }}</strong><small>{{ 'recebida' if regime == 'caixa' else 'por competência' }}</small></article>
+  <article class="metric-card"><span>Custo total</span><strong>{{ metrics.cost_total|currency_br }}</strong><small>{{ 'pago' if regime == 'caixa' else 'por competência' }}</small></article>
+  <article class="metric-card {{ 'positive' if metrics.result >= 0 else 'negative' }}"><span>Resultado</span><strong>{{ metrics.result|currency_br }}</strong><small>receita menos custo</small></article>
+  <article class="metric-card"><span>Margem</span><strong>{{ metrics.margin|percent_br }}</strong><small>sobre receita total</small></article>
+  <article class="metric-card"><span>Custo por litro</span><strong>{{ metrics.cost_per_liter|currency_br if metrics.cost_per_liter is not none else 'Não calculável' }}</strong><small>custo total / produção</small></article>
+  <article class="metric-card"><span>Receitas pendentes</span><strong>{{ metrics.pending_revenue|currency_br }}</strong><small>não recebidas</small></article>
+  <article class="metric-card"><span>Custos pendentes</span><strong>{{ metrics.pending_cost|currency_br }}</strong><small>não pagos</small></article>
+  <article class="metric-card"><span>Entradas no período</span><strong>{{ metrics.animals_added }}</strong><small>animais adicionados</small></article>
+  <article class="metric-card"><span>Saídas</span><strong>{{ metrics.animals_sold + metrics.animals_deceased }}</strong><small>{{ metrics.animals_sold }} vendidos · {{ metrics.animals_deceased }} falecidos</small></article>
+</section>
+
+{% if metrics.comparison %}
+<section class="card">
+  <div class="section-title"><div><h2>Comparação com período anterior equivalente</h2><p>{{ metrics.previous_period.label }}</p></div></div>
+  <div class="comparison-grid">
+    {% for key, label, unit, inverse in [('production_total','Produção','liters',false),('revenue_total','Receita','money',false),('cost_total','Custos','money',true),('result','Resultado','money',false),('animals_in_production','Animais em produção','number',false)] %}
+    {% set item = metrics.comparison[key] %}
+    <article class="comparison-card">
+      <span>{{ label }}</span>
+      <strong>{% if unit == 'money' %}{{ item.current|currency_br }}{% elif unit == 'liters' %}{{ item.current|liters_br }}{% else %}{{ item.current }}{% endif %}</strong>
+      <small>Anterior: {% if unit == 'money' %}{{ item.previous|currency_br }}{% elif unit == 'liters' %}{{ item.previous|liters_br }}{% else %}{{ item.previous }}{% endif %}</small>
+      <div class="variation {{ 'negative' if (item.difference > 0 and inverse) or (item.difference < 0 and not inverse) else 'positive' }}">Diferença: {% if unit == 'money' %}{{ item.difference|currency_br }}{% elif unit == 'liters' %}{{ item.difference|liters_br }}{% else %}{{ item.difference }}{% endif %} · {{ item.percentage|percent_br }}</div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<div class="grid-two">
+  <section class="card">
+    <div class="section-title"><div><h2>Evolução financeira mensal</h2><p>Receitas, custos e resultado do ano atual.</p></div></div>
+    <div class="chart-scroll"><canvas id="monthlySummaryChart" class="chart chart-financial" aria-label="Gráfico financeiro mensal"></canvas></div><div id="monthlySummaryLegend" class="chart-legend"></div>
+  </section>
+  <section class="card">
+    <div class="section-title"><div><h2>Últimos lançamentos</h2><p>Produções registradas recentemente.</p></div><a href="/producao">Ver todos</a></div>
+    {% if recent %}
+    <div class="table-wrap"><table><thead><tr><th>Data</th><th>Animal</th><th class="number">Litros</th></tr></thead><tbody>
+    {% for item in recent %}<tr><td>{{ item.data_registro|date_br }}</td><td><a href="/animais/{{ item.animal_id }}">{{ item.animal.identificacao }}</a></td><td class="number">{{ item.quantidade_litros|liters_br }}</td></tr>{% endfor %}
+    </tbody></table></div>
+    {% else %}<div class="empty-state"><strong>Nenhuma produção registrada</strong><p>Cadastre o primeiro lançamento para iniciar os indicadores produtivos.</p></div>{% endif %}
+  </section>
+</div>
+
+<section class="card">
+  <div class="section-title"><div><h2>Resultado estimado por animal e mês</h2><p>Quantidade produzida × valor por litro informado no lançamento. Não substitui a receita de venda.</p></div></div>
+  <div class="financial-controls no-print">
+    <div class="filter-group">
+      <div class="filter-heading"><strong>Animais</strong><span id="animalSelectionSummary"></span></div>
+      <div class="inline-actions"><button type="button" class="text-button" id="selectAllAnimals">Selecionar todos</button><button type="button" class="text-button" id="clearAnimals">Limpar</button></div>
+      <div class="checkbox-grid" id="animalSelector">
+        {% for dataset in financial_animal_datasets %}<label><input type="checkbox" value="{{ dataset.id }}" {{ 'checked' if loop.index <= 5 else '' }}> {{ dataset.label }}</label>{% endfor %}
+      </div>
+    </div>
+    <div class="filter-group">
+      <strong>Período do gráfico</strong>
+      <div class="filter-row"><label>Mês inicial<input id="financialStart" type="month"></label><label>Mês final<input id="financialEnd" type="month"></label><button type="button" class="button ghost" id="clearFinancialPeriod">Todo o período</button></div>
+      <div id="financialFilterError" class="field-error" hidden></div>
+    </div>
+  </div>
+  <p id="financialChartStatus" class="chart-status"></p>
+  <div class="chart-scroll"><canvas id="financialChart" class="chart chart-financial"></canvas></div>
+  <div id="financialLegend" class="chart-legend"></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+const monthlyChart = {{ monthly_chart|tojson }};
+drawSeriesChart('monthlySummaryChart', monthlyChart.labels, monthlyChart.series, 'monthlySummaryLegend');
+initMonthlyFinancialChart({canvasId:'financialChart',legendId:'financialLegend',selectorId:'animalSelector',startInputId:'financialStart',endInputId:'financialEnd',selectAllId:'selectAllAnimals',clearAnimalsId:'clearAnimals',clearPeriodId:'clearFinancialPeriod',summaryId:'animalSelectionSummary',statusId:'financialChartStatus',errorId:'financialFilterError',monthKeys:{{ financial_month_keys|tojson }},monthLabels:{{ financial_month_labels|tojson }},datasets:{{ financial_animal_datasets|tojson }}});
+</script>
+{% endblock %}

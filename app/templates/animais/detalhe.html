@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ animal.identificacao }}{% endblock %}
+{% block breadcrumb_items %}<span>›</span><a href="/animais">Animais</a><span>›</span><span>{{ animal.codigo }}</span>{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>{{ animal.identificacao }}</h1><p>{{ animal.raca or 'Raça não informada' }} · {{ animal.sexo }} · {{ animal.categoria }}</p></div>
+  <div class="actions no-print"><a class="button ghost" href="/relatorios/animal/{{ animal.id }}/pdf">PDF</a><a class="button ghost" href="/relatorios/animal/{{ animal.id }}/xlsx">Excel</a>{% if current_role != 'Consulta' %}<a class="button secondary" href="/animais/{{ animal.id }}/eventos/novo">Registrar evento</a><a class="button" href="/animais/{{ animal.id }}/editar">Editar</a>{% endif %}</div>
+</div>
+<nav class="section-nav no-print"><a href="#visao-geral">Visão geral</a><a href="#producao">Produção</a><a href="#financeiro">Financeiro</a><a href="#movimentacoes">Movimentações</a><a href="#eventos">Eventos</a><a href="#genealogia">Genealogia</a></nav>
+<section id="visao-geral" class="metric-grid five">
+  <article class="metric-card"><span>Situação</span><strong class="metric-text">{{ animal.status }}</strong><small>situação atual</small></article>
+  <article class="metric-card"><span>Categoria</span><strong class="metric-text">{{ animal.categoria }}</strong><small>{{ animal.origem }}</small></article>
+  <article class="metric-card"><span>Idade</span><strong class="metric-text">{{ animal.data_nascimento|age_label }}</strong><small>{{ animal.data_nascimento|date_br }}</small></article>
+  <article class="metric-card"><span>Produção total</span><strong>{{ litros_total|liters_br }}</strong><small>{{ animal.producoes|length }} lançamento(s)</small></article>
+  <article class="metric-card"><span>Última produção</span><strong class="metric-text">{{ ultima_producao|date_br }}</strong><small>{{ media|liters_br if media is not none else 'Sem média' }}</small></article>
+</section>
+<div class="grid-two">
+  <section class="card details"><div class="section-title"><div><h2>Dados cadastrais</h2><p>Identificação e entrada no rebanho.</p></div></div><dl>
+    <dt>Código</dt><dd>{{ animal.codigo }}</dd><dt>Brinco</dt><dd>{{ animal.brinco or '—' }}</dd><dt>Nome</dt><dd>{{ animal.nome or '—' }}</dd><dt>Sexo</dt><dd>{{ animal.sexo }}</dd><dt>Raça</dt><dd>{{ animal.raca or '—' }}</dd><dt>Data de nascimento</dt><dd>{{ animal.data_nascimento|date_br }}</dd><dt>Data de entrada</dt><dd>{{ animal.data_aquisicao|date_br }}</dd><dt>Origem</dt><dd>{{ animal.origem }}</dd><dt>Observações</dt><dd class="pre-line">{{ animal.observacoes or '—' }}</dd>
+  </dl></section>
+  <section id="financeiro" class="card"><div class="section-title"><div><h2>Resumo financeiro</h2><p>Valores diretamente relacionados e rateados.</p></div></div>
+    <div class="stacked-metrics"><div><span>Receitas diretas</span><strong>{{ direct_revenue|currency_br }}</strong></div><div><span>Custos diretos</span><strong>{{ direct_cost|currency_br }}</strong></div><div><span>Custos rateados</span><strong>{{ allocated_cost|currency_br }}</strong><small>valor distribuído, não necessariamente identificado diretamente</small></div><div><span>Resultado direto</span><strong>{{ direct_result|currency_br }}</strong></div><div><span>Resultado após rateios</span><strong>{{ allocated_result|currency_br }}</strong></div><div><span>Custo por litro</span><strong>{{ ((direct_cost + allocated_cost) / litros_total)|currency_br if litros_total else 'Não calculável' }}</strong></div></div>
+  </section>
+</div>
+<section id="producao" class="card"><div class="section-title"><div><h2>Produção</h2><p>Evolução dos lançamentos do animal.</p></div>{% if current_role != 'Consulta' %}<a class="button compact" href="/producao/nova?animal_id={{ animal.id }}">Nova produção</a>{% endif %}</div>
+{% if animal.producoes %}<div class="chart-scroll"><canvas id="animalProductionChart" class="chart"></canvas></div><div class="table-wrap"><table><thead><tr><th>Data</th><th class="number">Litros</th><th class="number">Valor/L</th><th class="number">Estimativa</th></tr></thead><tbody>{% for item in animal.producoes|reverse %}<tr><td>{{ item.data_registro|date_br }}</td><td class="number">{{ item.quantidade_litros|liters_br }}</td><td class="number">{{ item.valor_litro|currency_br if item.valor_litro is not none else '—' }}</td><td class="number">{{ item.valor_total|currency_br }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><strong>Sem produção registrada</strong><p>Não há lançamentos para este animal.</p></div>{% endif %}
+</section>
+<div class="grid-two">
+<section id="movimentacoes" class="card"><div class="section-title"><div><h2>Movimentações</h2><p>Entradas, saídas e alterações de situação.</p></div></div>
+{% if animal.movimentacoes %}<div class="timeline">{% for item in animal.movimentacoes|reverse %}<article><time>{{ item.data|date_br }}</time><strong>{{ item.tipo }}</strong><span>{{ item.situacao_anterior or '—' }} → {{ item.situacao_posterior or '—' }}</span><p>{{ item.motivo or '' }}{% if item.observacoes %}<br>{{ item.observacoes }}{% endif %}</p></article>{% endfor %}</div>{% else %}<div class="empty-state"><strong>Sem movimentações</strong></div>{% endif %}
+</section>
+<section id="eventos" class="card"><div class="section-title"><div><h2>Eventos</h2><p>Histórico produtivo, reprodutivo, sanitário e geral.</p></div>{% if current_role != 'Consulta' %}<a class="button compact ghost" href="/animais/{{ animal.id }}/eventos/novo">Novo evento</a>{% endif %}</div>
+{% if animal.eventos %}<div class="timeline">{% for item in animal.eventos|reverse %}<article><time>{{ item.data|date_br }}</time><strong>{{ item.tipo }}</strong><span>{{ item.grupo }}</span><p>{{ item.titulo }}{% if item.descricao %}<br>{{ item.descricao }}{% endif %}</p></article>{% endfor %}</div>{% else %}<div class="empty-state"><strong>Sem eventos registrados</strong></div>{% endif %}
+</section>
+</div>
+<section id="genealogia" class="card"><div class="section-title"><div><h2>Genealogia</h2><p>Ascendentes e descendentes conhecidos.</p></div></div><div class="genealogy-grid"><div><span>Mãe</span><strong>{% if animal.mae %}<a href="/animais/{{ animal.mae.id }}">{{ animal.mae.identificacao }}</a>{% else %}Não informada{% endif %}</strong></div><div><span>Pai</span><strong>{% if animal.pai %}<a href="/animais/{{ animal.pai.id }}">{{ animal.pai.identificacao }}</a>{% else %}Não informado{% endif %}</strong></div><div class="full"><span>Descendentes</span>{% if descendants %}<div class="chip-list">{% for item in descendants %}<a class="chip" href="/animais/{{ item.id }}">{{ item.identificacao }}</a>{% endfor %}</div>{% else %}<strong>Nenhum descendente cadastrado</strong>{% endif %}</div></div></section>
+{% if current_role != 'Consulta' %}
+<section class="card no-print"><div class="section-title"><div><h2>Alterar situação</h2><p>A alteração cria uma movimentação e preserva o histórico.</p></div></div><form class="form-grid" method="post" action="/animais/{{ animal.id }}/situacao" data-confirm="Confirma a alteração de situação deste animal?"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>Nova situação<select name="situacao" required>{% for item in ['Ativo','Vendido','Falecido','Transferido','Inativo'] %}<option value="{{ item }}" {{ 'selected' if animal.status == item else '' }}>{{ item }}</option>{% endfor %}</select></label><label>Data<input type="date" name="data_movimentacao" value="{{ request.state.today if request.state.today is defined else '' }}" required></label><label class="full">Motivo<input name="motivo" maxlength="250" required></label><label class="full">Observações<textarea name="observacoes" rows="3"></textarea></label><div class="full form-actions"><button class="button" type="submit">Registrar alteração</button></div></form>
+<div class="danger-zone"><form method="post" action="/animais/{{ animal.id }}/excluir" data-confirm="Confirma a exclusão? Se houver histórico, o animal será apenas inativado."><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button danger" type="submit">Excluir ou inativar</button></form></div></section>
+{% endif %}
+{% endblock %}
+{% block scripts %}{% if animal.producoes %}<script>drawLineChart('animalProductionChart', {{ chart_labels|tojson }}, {{ chart_values|tojson }}, 'L');</script>{% endif %}{% endblock %}

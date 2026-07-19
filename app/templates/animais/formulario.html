@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% set editing = animal is not none %}
+{% block title %}{{ 'Editar animal' if editing else 'Novo animal' }}{% endblock %}
+{% block breadcrumb_items %}<span>›</span><a href="/animais">Animais</a><span>›</span><span>{{ 'Editar' if editing else 'Novo' }}</span>{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>{{ 'Editar animal' if editing else 'Novo animal' }}</h1><p>Preencha a identificação, entrada, categoria, situação e genealogia.</p></div></div>
+{% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+<form class="card form-card prevent-double-submit" method="post" action="{{ '/animais/' ~ animal.id ~ '/editar' if editing else '/animais/novo' }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="form_token" value="{{ form_token }}">
+  <section class="form-section"><h2>Identificação</h2><div class="form-grid">
+    <label>Código ou brinco principal *<input class="{{ 'invalid' if field_errors.codigo else '' }}" name="codigo" maxlength="30" required value="{{ form_data.get('codigo', animal.codigo if editing else '') }}">{% if field_errors.codigo %}<span class="field-error">{{ field_errors.codigo }}</span>{% endif %}</label>
+    <label>Brinco adicional<input class="{{ 'invalid' if field_errors.brinco else '' }}" name="brinco" maxlength="30" value="{{ form_data.get('brinco', animal.brinco if editing and animal.brinco else '') }}">{% if field_errors.brinco %}<span class="field-error">{{ field_errors.brinco }}</span>{% endif %}</label>
+    <label>Nome<input name="nome" maxlength="100" value="{{ form_data.get('nome', animal.nome if editing and animal.nome else '') }}"></label>
+    <label>Sexo<select name="sexo">{% set current = form_data.get('sexo', animal.sexo if editing else 'Não informado') %}{% for item in sexos %}<option value="{{ item }}" {{ 'selected' if current == item else '' }}>{{ item }}</option>{% endfor %}</select></label>
+    <label>Raça<input name="raca" maxlength="80" value="{{ form_data.get('raca', animal.raca if editing and animal.raca else '') }}"></label>
+    <label>Categoria<select name="categoria">{% set current = form_data.get('categoria', animal.categoria if editing else 'Não informado') %}{% for item in categorias %}<option value="{{ item }}" {{ 'selected' if current == item else '' }}>{{ item }}</option>{% endfor %}</select></label>
+  </div></section>
+  <section class="form-section"><h2>Datas e entrada</h2><div class="form-grid">
+    <label>Data de nascimento<input class="{{ 'invalid' if field_errors.data_nascimento else '' }}" type="date" name="data_nascimento" value="{{ form_data.get('data_nascimento', animal.data_nascimento.isoformat() if editing and animal.data_nascimento else '') }}">{% if field_errors.data_nascimento %}<span class="field-error">{{ field_errors.data_nascimento }}</span>{% endif %}</label>
+    <label>Data de entrada {{ '*' if not editing else '' }}<input class="{{ 'invalid' if field_errors.data_aquisicao else '' }}" type="date" name="data_aquisicao" value="{{ form_data.get('data_aquisicao', animal.data_aquisicao.isoformat() if editing and animal.data_aquisicao else '') }}" {{ 'required' if not editing else '' }}>{% if field_errors.data_aquisicao %}<span class="field-error">{{ field_errors.data_aquisicao }}</span>{% endif %}</label>
+    <label>Origem<select name="origem">{% set current = form_data.get('origem', animal.origem if editing else 'Não informado') %}{% for item in origens %}<option value="{{ item }}" {{ 'selected' if current == item else '' }}>{{ item }}</option>{% endfor %}</select></label>
+    <label>Situação<select name="status">{% set current = form_data.get('status', animal.status if editing else 'Ativo') %}{% for item in situacoes %}<option value="{{ item }}" {{ 'selected' if current == item else '' }}>{{ item }}</option>{% endfor %}</select></label>
+  </div></section>
+  <section class="form-section"><h2>Genealogia</h2><div class="form-grid">
+    <label>Mãe<select class="{{ 'invalid' if field_errors.mae_id else '' }}" name="mae_id"><option value="">Não informada</option>{% set current = form_data.get('mae_id', animal.mae_id if editing else '')|string %}{% for item in maes %}<option value="{{ item.id }}" {{ 'selected' if current == item.id|string else '' }}>{{ item.identificacao }} · {{ item.sexo }}</option>{% endfor %}</select>{% if field_errors.mae_id %}<span class="field-error">{{ field_errors.mae_id }}</span>{% endif %}</label>
+    <label>Pai<select class="{{ 'invalid' if field_errors.pai_id else '' }}" name="pai_id"><option value="">Não informado</option>{% set current = form_data.get('pai_id', animal.pai_id if editing else '')|string %}{% for item in pais %}<option value="{{ item.id }}" {{ 'selected' if current == item.id|string else '' }}>{{ item.identificacao }} · {{ item.sexo }}</option>{% endfor %}</select>{% if field_errors.pai_id %}<span class="field-error">{{ field_errors.pai_id }}</span>{% endif %}</label>
+    <label class="full">Observações<textarea class="{{ 'invalid' if field_errors.observacoes else '' }}" name="observacoes" rows="5" maxlength="5000">{{ form_data.get('observacoes', animal.observacoes if editing and animal.observacoes else '') }}</textarea>{% if field_errors.observacoes %}<span class="field-error">{{ field_errors.observacoes }}</span>{% endif %}</label>
+  </div></section>
+  <div class="form-actions"><a class="button ghost" href="{{ '/animais/' ~ animal.id if editing else '/animais' }}">Cancelar</a><button class="button" type="submit">{{ 'Salvar alterações' if editing else 'Cadastrar animal' }}</button></div>
+</form>
+{% endblock %}

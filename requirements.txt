@@ -1,0 +1,2 @@
+-r requirements-local.txt
+psycopg[binary]==3.3.4

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Central de relatórios{% endblock %}
+{% block breadcrumb_items %}<span>›</span><span>Relatórios</span>{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Central de relatórios</h1><p>Consultas gerenciais, produtivas, financeiras e históricas com exportação.</p></div><button class="button ghost no-print" type="button" onclick="window.print()">Imprimir página</button></div>
+{% set groups = {
+  'Gerenciais': ['mensal','financeiro'],
+  'Produção': ['producao','producao-custos'],
+  'Animais': ['animais'],
+  'Financeiros': ['custos','receitas'],
+  'Eventos e movimentações': ['eventos']
+} %}
+{% for group, keys in groups.items() %}
+<section class="report-group">
+  <div class="section-title"><div><h2>{{ group }}</h2></div></div>
+  <div class="report-card-grid">
+  {% for key in keys %}{% set meta = reports[key] %}
+    <article class="card report-card">
+      <div><h3>{{ meta[0] }}</h3><p>{{ meta[1] }}</p></div>
+      <div class="report-filters"><span>Período</span><span>Regime</span>{% if key == 'mensal' %}<span>Ano</span>{% endif %}</div>
+      <div class="actions no-print">
+        <a class="button" href="/relatorios/{{ key }}">Visualizar</a>
+        <a class="button secondary" href="/relatorios/{{ key }}/xlsx">Excel</a>
+        <a class="button ghost" href="/relatorios/{{ key }}/pdf">PDF</a>
+        <a class="button ghost" href="/relatorios/{{ key }}/csv">CSV</a>
+      </div>
+    </article>
+  {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% endblock %}

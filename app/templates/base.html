@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>{% block title %}Sistema de Gestão de Animais{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='/print.css') }}" media="print">
+</head>
+<body class="{% if not current_username %}auth-layout{% endif %}">
+{% if current_username %}
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar" aria-label="Navegação principal">
+    <div class="sidebar-brand">
+      <span class="brand-mark" aria-hidden="true">GA</span>
+      <div><strong>Gestão de Animais</strong><small>Produção e resultado</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="{{ 'active' if current_path == '/' else '' }}" href="/"><span aria-hidden="true">▦</span>Painel</a>
+      <a class="{{ 'active' if current_path.startswith('/animais') else '' }}" href="/animais"><span aria-hidden="true">◉</span>Animais</a>
+      <a class="{{ 'active' if current_path.startswith('/producao') else '' }}" href="/producao"><span aria-hidden="true">◫</span>Produção</a>
+      <a class="{{ 'active' if current_path.startswith('/custos') else '' }}" href="/custos"><span aria-hidden="true">−</span>Custos</a>
+      <a class="{{ 'active' if current_path.startswith('/receitas') else '' }}" href="/receitas"><span aria-hidden="true">+</span>Receitas</a>
+      <a class="{{ 'active' if current_path.startswith('/relatorios') else '' }}" href="/relatorios"><span aria-hidden="true">▤</span>Relatórios</a>
+      {% if current_role == 'Administrador' %}
+      <span class="nav-section">Administração</span>
+      <a class="{{ 'active' if current_path.startswith('/admin/usuarios') else '' }}" href="/admin/usuarios"><span aria-hidden="true">♙</span>Usuários</a>
+      <a class="{{ 'active' if current_path.startswith('/admin/auditoria') else '' }}" href="/admin/auditoria"><span aria-hidden="true">◎</span>Auditoria</a>
+      <a class="{{ 'active' if current_path.startswith('/admin/backup') else '' }}" href="/admin/backup"><span aria-hidden="true">⇩</span>Backup</a>
+      {% endif %}
+    </nav>
+    <div class="sidebar-footer">
+      <a href="/conta/senha">Alterar senha</a>
+      <form method="post" action="/logout">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit">Sair</button>
+      </form>
+    </div>
+  </aside>
+  <div class="app-main">
+    <header class="topbar">
+      <button class="menu-toggle" id="menuToggle" type="button" aria-label="Abrir menu" aria-controls="sidebar" aria-expanded="false">☰</button>
+      <div class="topbar-title">Sistema de Gestão de Animais</div>
+      <div class="user-chip"><span>{{ current_role or 'Usuário' }}</span><strong>{{ current_user_name }}</strong></div>
+    </header>
+    <main class="content" id="main-content">
+      {% block breadcrumbs %}
+      <nav class="breadcrumbs no-print" aria-label="Navegação estrutural"><a href="/">Painel</a>{% block breadcrumb_items %}{% endblock %}</nav>
+      {% endblock %}
+      {% if must_change_password %}<div class="alert warning" role="alert">Altere a senha inicial antes de utilizar o sistema.</div>{% endif %}
+      {% for flash in flashes %}<div class="alert {{ flash.category }}" role="status">{{ flash.message }}</div>{% endfor %}
+      {% block content %}{% endblock %}
+    </main>
+    <footer class="app-footer">Sistema de Gestão de Animais · Versão 2.0</footer>
+  </div>
+</div>
+{% else %}
+<main class="auth-container">{% block auth_content %}{% block content_public %}{% endblock %}{% endblock %}</main>
+{% endif %}
+<script src="{{ url_for('static', path='/charts.js') }}"></script>
+<script src="{{ url_for('static', path='/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

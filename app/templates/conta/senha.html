@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Alterar senha{% endblock %}
+{% block breadcrumb_items %}<span>›</span><span>Alterar senha</span>{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Alterar senha</h1><p>A alteração encerra as sessões existentes.</p></div></div>
+<section class="card narrow-card">
+  {% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+  <form class="password-form prevent-double-submit" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Senha atual<input type="password" name="current_password" autocomplete="current-password" required></label>
+    <label>Nova senha<input type="password" name="new_password" autocomplete="new-password" minlength="8" required></label>
+    <label>Confirmar nova senha<input type="password" name="confirm_password" autocomplete="new-password" minlength="8" required></label>
+    <button class="button" type="submit">Alterar senha</button>
+  </form>
+</section>
+{% endblock %}

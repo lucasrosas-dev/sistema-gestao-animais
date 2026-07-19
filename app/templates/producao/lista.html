@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Produção{% endblock %}
+{% block breadcrumb_items %}<span>›</span><span>Produção</span>{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Produção</h1><p>Lançamentos de leite por animal e período.</p></div>{% if current_role != 'Consulta' %}<div class="actions"><a class="button" href="/producao/nova">Nova produção</a></div>{% endif %}</div>
+{% for error in errors %}<div class="alert error">{{ error }}</div>{% endfor %}
+<form class="filter-card" method="get">
+  <label>Animal<select name="animal_id"><option value="">Todos</option>{% for animal in animais %}<option value="{{ animal.id }}" {{ 'selected' if animal_id == animal.id else '' }}>{{ animal.identificacao }}</option>{% endfor %}</select></label>
+  <label>Data inicial<input type="date" name="data_inicio" value="{{ data_inicio }}"></label><label>Data final<input type="date" name="data_fim" value="{{ data_fim }}"></label>
+  <label>Por página<select name="per_page">{% for n in [10,20,50,100] %}<option value="{{ n }}" {{ 'selected' if per_page == n else '' }}>{{ n }}</option>{% endfor %}</select></label>
+  <div class="filter-actions"><button class="button" type="submit">Filtrar</button><a class="button ghost" href="/producao">Limpar</a></div>
+</form>
+<div class="list-summary">{{ total }} registro(s) encontrado(s).</div>
+{% if producoes %}<div class="card table-card"><div class="table-wrap"><table><thead><tr><th>Data</th><th>Animal</th><th class="number">Quantidade</th><th class="number">Valor por litro</th><th class="number">Valor estimado</th><th>Observações</th><th class="no-print">Ações</th></tr></thead><tbody>
+{% for item in producoes %}<tr><td>{{ item.data_registro|date_br }}</td><td><strong>{{ item.animal.codigo }}</strong><span class="table-subtitle">{{ item.animal.nome or 'Sem nome' }}</span></td><td class="number">{{ item.quantidade_litros|liters_br }}</td><td class="number">{{ item.valor_litro|currency_br if item.valor_litro is not none else '—' }}</td><td class="number">{{ item.valor_total|currency_br }}</td><td>{{ item.observacoes or '—' }}</td><td class="no-print"><div class="row-actions">{% if current_role != 'Consulta' %}<a class="button compact secondary" href="/producao/{{ item.id }}/editar">Editar</a><form method="post" action="/producao/{{ item.id }}/excluir" data-confirm="Confirma a exclusão deste lançamento de produção?"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button compact danger" type="submit">Excluir</button></form>{% else %}<span>Somente leitura</span>{% endif %}</div></td></tr>{% endfor %}
+</tbody></table></div></div>
+<nav class="pagination no-print">{% if page > 1 %}<a class="button ghost compact" href="?animal_id={{ animal_id_raw }}&data_inicio={{ data_inicio }}&data_fim={{ data_fim }}&per_page={{ per_page }}&page={{ page-1 }}">Anterior</a>{% endif %}<span>Página {{ page }} de {{ pages }}</span>{% if page < pages %}<a class="button ghost compact" href="?animal_id={{ animal_id_raw }}&data_inicio={{ data_inicio }}&data_fim={{ data_fim }}&per_page={{ per_page }}&page={{ page+1 }}">Próxima</a>{% endif %}</nav>
+{% else %}<section class="card empty-state"><strong>Nenhum lançamento encontrado</strong><p>Não existem produções para os filtros informados.</p>{% if current_role != 'Consulta' %}<a class="button" href="/producao/nova">Registrar produção</a>{% endif %}</section>{% endif %}
+{% endblock %}

@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: sistema-gestao-animais
+    runtime: python
+    plan: free
+    buildCommand: python -m pip install --upgrade pip && pip install -r requirements.txt && python -m compileall -q app migrations
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.14.3"
+      - key: APP_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SESSION_MAX_AGE
+        value: "28800"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: RESET_ADMIN_PASSWORD
+        value: "false"

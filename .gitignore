@@ -1,0 +1,14 @@
+.venv/
+.agents/
+.codex/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+*.log
+diagnostico.txt
+data/*.db
+data/*.dba
+.DS_Store
+.vscode/
+.idea/

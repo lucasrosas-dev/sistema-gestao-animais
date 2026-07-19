@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Animais{% endblock %}
+{% block breadcrumb_items %}<span>›</span><span>Animais</span>{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Animais</h1><p>Cadastro, situação, genealogia e histórico do rebanho.</p></div>{% if current_role != 'Consulta' %}<div class="actions"><a class="button" href="/animais/novo">Novo animal</a></div>{% endif %}</div>
+<form class="filter-card" method="get">
+  <label class="grow">Busca<input name="busca" value="{{ busca }}" placeholder="Código, brinco, nome ou raça"></label>
+  <label>Sexo<select name="sexo"><option value="">Todos</option>{% for item in sexos %}<option value="{{ item }}" {{ 'selected' if sexo == item else '' }}>{{ item }}</option>{% endfor %}</select></label>
+  <label>Categoria<select name="categoria"><option value="">Todas</option>{% for item in categorias %}<option value="{{ item }}" {{ 'selected' if categoria == item else '' }}>{{ item }}</option>{% endfor %}</select></label>
+  <label>Situação<select name="situacao"><option value="">Todas</option>{% for item in situacoes %}<option value="{{ item }}" {{ 'selected' if situacao == item else '' }}>{{ item }}</option>{% endfor %}</select></label>
+  <label class="check-inline"><input type="checkbox" name="mostrar_todos" value="1" {{ 'checked' if mostrar_todos else '' }}> Mostrar todos</label>
+  <label>Por página<select name="per_page">{% for n in [10,20,50,100] %}<option value="{{ n }}" {{ 'selected' if per_page == n else '' }}>{{ n }}</option>{% endfor %}</select></label>
+  <div class="filter-actions"><button class="button" type="submit">Filtrar</button><a class="button ghost" href="/animais">Limpar</a></div>
+</form>
+<div class="list-summary">{{ total }} registro(s) encontrado(s).</div>
+{% if rows %}
+<div class="card table-card"><div class="table-wrap"><table><thead><tr><th>Código / nome</th><th>Sexo</th><th>Categoria</th><th>Situação</th><th>Nascimento</th><th>Idade</th><th>Última produção</th><th class="no-print">Ações</th></tr></thead><tbody>
+{% for animal, last_date in rows %}
+<tr>
+  <td><strong>{{ animal.codigo }}</strong><span class="table-subtitle">{{ animal.nome or 'Sem nome' }}{% if animal.brinco %} · Brinco {{ animal.brinco }}{% endif %}</span></td>
+  <td>{{ animal.sexo }}</td><td>{{ animal.categoria }}</td>
+  <td><span class="badge {{ 'success' if animal.status == 'Ativo' else 'warning' if animal.status in ['Vendido','Transferido'] else 'neutral' }}">{{ animal.status }}</span></td>
+  <td>{{ animal.data_nascimento|date_br }}</td><td>{{ animal.data_nascimento|age_label }}</td><td>{{ last_date|date_br }}</td>
+  <td class="no-print"><div class="row-actions"><a class="button compact ghost" href="/animais/{{ animal.id }}">Visualizar</a>{% if current_role != 'Consulta' %}<a class="button compact secondary" href="/animais/{{ animal.id }}/editar">Editar</a><a class="button compact ghost" href="/animais/{{ animal.id }}/eventos/novo">Evento</a>{% endif %}</div></td>
+</tr>
+{% endfor %}
+</tbody></table></div></div>
+<nav class="pagination no-print" aria-label="Paginação">
+  {% if page > 1 %}<a class="button ghost compact" href="?busca={{ busca }}&sexo={{ sexo }}&categoria={{ categoria }}&situacao={{ situacao }}&mostrar_todos={{ mostrar_todos }}&per_page={{ per_page }}&page={{ page-1 }}">Anterior</a>{% endif %}
+  <span>Página {{ page }} de {{ pages }}</span>
+  {% if page < pages %}<a class="button ghost compact" href="?busca={{ busca }}&sexo={{ sexo }}&categoria={{ categoria }}&situacao={{ situacao }}&mostrar_todos={{ mostrar_todos }}&per_page={{ per_page }}&page={{ page+1 }}">Próxima</a>{% endif %}
+</nav>
+{% else %}<section class="card empty-state"><strong>Nenhum animal encontrado</strong><p>Revise os filtros ou cadastre um novo animal.</p>{% if current_role != 'Consulta' %}<a class="button" href="/animais/novo">Cadastrar animal</a>{% endif %}</section>{% endif %}
+{% endblock %}

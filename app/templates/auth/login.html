@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Entrar{% endblock %}
+{% block auth_content %}
+<section class="card auth-card">
+  <div class="auth-heading"><span class="brand-mark">GA</span><h1>Gestão de Animais</h1><p>Entre para acessar o sistema.</p></div>
+  {% if erro %}<div class="alert error" role="alert">{{ erro }}</div>{% endif %}
+  <form class="auth-form" method="post" action="/login">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="next" value="{{ next_url }}">
+    <label>Usuário<input name="username" autocomplete="username" required autofocus></label>
+    <label>Senha<input type="password" name="password" autocomplete="current-password" required></label>
+    <button class="button" type="submit">Entrar</button>
+  </form>
+  {% if not is_production %}<p class="local-access-note">Acesso inicial local: <code>admin</code> / <code>admin12345</code>.</p>{% endif %}
+</section>
+{% endblock %}

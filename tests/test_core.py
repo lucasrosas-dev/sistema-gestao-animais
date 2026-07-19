@@ -1,0 +1,94 @@
+from __future__ import annotations
+
+from sqlalchemy import select
+
+from app.database import SessionLocal
+from app.models import User
+from app.security import hash_password, verify_password
+from conftest import hidden, login
+
+
+def test_health_and_ready(client):
+    assert client.get("/health").json() == {"status": "ok", "database": "ok", "version": "1.0.0"}
+    assert client.get("/ready").json()["database"] == "ok"
+
+
+def test_protected_route_redirects_to_login(client):
+    response = client.get("/animais", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("/login")
+
+
+def test_login_logout_and_generic_failure(client):
+    bad_page = client.get("/login")
+    bad = client.post("/login", data={"username": "naoexiste", "password": "errada", "csrf_token": hidden(bad_page.text, "csrf_token")})
+    assert bad.status_code == 401
+    assert "Usuário ou senha inválidos" in bad.text
+    assert "não existe" not in bad.text
+    assert login(client).status_code == 303
+    home = client.get("/")
+    token = hidden(home.text, "csrf_token")
+    out = client.post("/logout", data={"csrf_token": token}, follow_redirects=False)
+    assert out.status_code == 303
+    assert client.get("/animais", follow_redirects=False).status_code == 303
+
+
+def test_invalid_and_missing_csrf_are_friendly(client):
+    login(client)
+    response = client.post("/animais/novo", data={"codigo": "X", "sexo": "Fêmea"})
+    assert response.status_code == 403
+    assert "Acesso negado" in response.text
+    assert "traceback" not in response.text.lower()
+
+
+def test_error_pages_do_not_expose_internal_details(client):
+    login(client)
+    not_found = client.get("/rota-inexistente")
+    assert not_found.status_code == 404
+    assert "Página não encontrada" in not_found.text
+    invalid_method = client.put("/animais")
+    assert invalid_method.status_code == 405
+    for response in (not_found, invalid_method):
+        text = response.text.lower()
+        assert "traceback" not in text
+        assert "sqlalchemy" not in text
+
+
+def test_password_hash_and_comparison():
+    encoded = hash_password("Senha forte 123")
+    assert encoded != "Senha forte 123"
+    assert verify_password("Senha forte 123", encoded)
+    assert not verify_password("outra", encoded)
+
+
+def test_change_password_invalidates_session(client):
+    login(client)
+    page = client.get("/conta/senha")
+    response = client.post("/conta/senha", data={"current_password": "test-password-123", "new_password": "nova-senha-123", "confirm_password": "nova-senha-123", "csrf_token": hidden(page.text, "csrf_token")}, follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/login"
+    assert client.get("/", follow_redirects=False).status_code == 303
+    assert login(client, password="nova-senha-123").status_code == 303
+
+
+def test_password_policy_rejects_login_as_password(client):
+    login(client)
+    page = client.get("/conta/senha")
+    response = client.post("/conta/senha", data={"current_password": "test-password-123", "new_password": "admin", "confirm_password": "admin", "csrf_token": hidden(page.text, "csrf_token")})
+    assert response.status_code == 400
+    assert "pelo menos oito" in response.text or "igual ao login" in response.text
+
+
+def test_inactive_user_cannot_login(client):
+    with SessionLocal() as db:
+        db.add(User(username="inativo", name="Inativo", role="Consulta", password_hash=hash_password("senha-inativo-123"), is_active=False, must_change_password=False, session_version=1))
+        db.commit()
+    response = login(client, "inativo", "senha-inativo-123")
+    assert response.status_code == 401
+
+
+def test_security_headers(client):
+    response = client.get("/login")
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert "frame-ancestors" in response.headers["content-security-policy"]
