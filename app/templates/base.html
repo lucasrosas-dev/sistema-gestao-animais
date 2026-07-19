@@ -17,7 +17,7 @@
       <div><strong>Gestão de Animais</strong><small>Produção e resultado</small></div>
     </div>
     <nav class="sidebar-nav">
-      <a class="{{ 'active' if current_path == '/' else '' }}" href="/"><span aria-hidden="true">▦</span>Painel</a>
+      <a class="{{ 'active' if current_path in ['/', '/painel'] else '' }}" href="/painel"><span aria-hidden="true">▦</span>Painel</a>
       <a class="{{ 'active' if current_path.startswith('/animais') else '' }}" href="/animais"><span aria-hidden="true">◉</span>Animais</a>
       <a class="{{ 'active' if current_path.startswith('/producao') else '' }}" href="/producao"><span aria-hidden="true">◫</span>Produção</a>
       <a class="{{ 'active' if current_path.startswith('/custos') else '' }}" href="/custos"><span aria-hidden="true">−</span>Custos</a>
@@ -46,7 +46,7 @@
     </header>
     <main class="content" id="main-content">
       {% block breadcrumbs %}
-      <nav class="breadcrumbs no-print" aria-label="Navegação estrutural"><a href="/">Painel</a>{% block breadcrumb_items %}{% endblock %}</nav>
+      <nav class="breadcrumbs no-print" aria-label="Navegação estrutural"><a href="/painel">Painel</a>{% block breadcrumb_items %}{% endblock %}</nav>
       {% endblock %}
       {% if must_change_password %}<div class="alert warning" role="alert">Altere a senha inicial antes de utilizar o sistema.</div>{% endif %}
       {% for flash in flashes %}<div class="alert {{ flash.category }}" role="status">{{ flash.message }}</div>{% endfor %}

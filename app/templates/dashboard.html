@@ -25,7 +25,7 @@
     <select name="regime"><option value="competencia" {{ 'selected' if regime == 'competencia' else '' }}>Competência</option><option value="caixa" {{ 'selected' if regime == 'caixa' else '' }}>Caixa</option></select>
   </label>
   <label class="check-inline"><input type="checkbox" name="comparar" value="1" {{ 'checked' if comparar == '1' else '' }}> Comparar período anterior</label>
-  <div class="filter-actions"><button class="button" type="submit">Aplicar</button><a class="button ghost" href="/">Limpar</a></div>
+  <div class="filter-actions"><button class="button" type="submit">Aplicar</button><a class="button ghost" href="/painel">Limpar</a></div>
 </form>
 <div class="period-summary"><strong>Período:</strong> {{ period.label }} · <strong>Regime:</strong> {{ 'Caixa' if regime == 'caixa' else 'Competência' }}</div>
 

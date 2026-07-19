@@ -66,7 +66,7 @@ def test_change_password_invalidates_session(client):
     page = client.get("/conta/senha")
     response = client.post("/conta/senha", data={"current_password": "test-password-123", "new_password": "nova-senha-123", "confirm_password": "nova-senha-123", "csrf_token": hidden(page.text, "csrf_token")}, follow_redirects=False)
     assert response.status_code == 303
-    assert response.headers["location"] == "/login?next=/"
+    assert response.headers["location"] == "/login?next=/painel"
     assert client.get("/", follow_redirects=False).status_code == 303
     assert login(client, password="nova-senha-123").status_code == 303
 
@@ -111,7 +111,7 @@ def test_operator_is_redirected_to_dashboard_after_forced_password_change(client
         follow_redirects=False,
     )
     assert changed.status_code == 303
-    assert changed.headers["location"] == "/login?next=/"
+    assert changed.headers["location"] == "/login?next=/painel"
 
     relogin_page = client.get("/login?next=/admin/usuarios")
     relogin = client.post(
@@ -125,8 +125,11 @@ def test_operator_is_redirected_to_dashboard_after_forced_password_change(client
         follow_redirects=False,
     )
     assert relogin.status_code == 303
-    assert relogin.headers["location"] == "/"
-    dashboard = client.get("/")
+    assert relogin.headers["location"] == "/painel"
+    root = client.get("/", follow_redirects=False)
+    assert root.status_code == 303
+    assert root.headers["location"] == "/painel"
+    dashboard = client.get("/painel")
     assert dashboard.status_code == 200
     assert "Acesso negado" not in dashboard.text
 

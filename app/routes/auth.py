@@ -17,19 +17,21 @@ login_limiter = LoginAttemptLimiter()
 
 
 def login_destination(user: User, requested_url: str) -> str:
-    destination = safe_next_url(requested_url)
+    destination = safe_next_url(requested_url, "/painel")
+    if destination == "/":
+        return "/painel"
     if user.role != "Administrador" and (
         destination == "/admin" or destination.startswith("/admin/")
     ):
-        return "/"
+        return "/painel"
     return destination
 
 
 @router.get("/login", response_class=HTMLResponse)
-def login_form(request: Request, next: str = "/"):
+def login_form(request: Request, next: str = "/painel"):
     if request.session.get("user_id"):
-        return RedirectResponse("/", status_code=303)
-    return render(request, "auth/login.html", erro=None, next_url=safe_next_url(next))
+        return RedirectResponse("/painel", status_code=303)
+    return render(request, "auth/login.html", erro=None, next_url=safe_next_url(next, "/painel"))
 
 
 @router.post("/login", response_class=HTMLResponse)
@@ -39,7 +41,7 @@ def login(
     username: Annotated[str, Form()],
     password: Annotated[str, Form()],
     csrf_token: CSRFToken,
-    next: Annotated[str, Form()] = "/",
+    next: Annotated[str, Form()] = "/painel",
 ):
     verify_csrf_token(request, csrf_token)
     client_key = request.client.host if request.client else "desconhecido"
@@ -110,4 +112,4 @@ def change_password(
     db.commit()
     request.session.clear()
     add_flash(request, "Senha alterada. Entre novamente com a nova senha.", "success")
-    return RedirectResponse("/login?next=/", status_code=303)
+    return RedirectResponse("/login?next=/painel", status_code=303)

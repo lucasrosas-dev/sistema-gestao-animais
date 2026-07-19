@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
 
@@ -18,7 +18,12 @@ from ..web import DBSession, render
 router = APIRouter()
 
 
-@router.get("/", response_class=HTMLResponse)
+@router.get("/")
+def dashboard_root():
+    return RedirectResponse("/painel", status_code=303)
+
+
+@router.get("/painel", response_class=HTMLResponse)
 def dashboard(
     request: Request,
     db: DBSession,
