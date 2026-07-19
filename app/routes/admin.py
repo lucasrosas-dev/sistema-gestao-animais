@@ -108,15 +108,38 @@ def update_user(request: Request, user_id: int, db: DBSession, csrf_token: CSRFT
     return RedirectResponse("/admin/usuarios", status_code=303)
 
 
+@router.get("/usuarios/{user_id}/redefinir-senha", response_class=HTMLResponse)
+def reset_user_password_form(request: Request, user_id: int, db: DBSession):
+    admin_user(request, db)
+    return render(
+        request,
+        "admin/redefinir_senha.html",
+        usuario=user_or_404(db, user_id),
+        erro=None,
+    )
+
+
 @router.post("/usuarios/{user_id}/redefinir-senha")
 def reset_user_password(request: Request, user_id: int, db: DBSession, csrf_token: CSRFToken, new_password: Annotated[str, Form()], confirm_password: Annotated[str, Form()]):
     verify_csrf_token(request, csrf_token)
     admin = admin_user(request, db)
     user = user_or_404(db, user_id)
     if len(new_password) < 8 or not new_password.strip() or new_password.lower() == user.username.lower():
-        raise HTTPException(status_code=400, detail="A senha deve ter oito caracteres, não pode ser vazia e não pode ser igual ao login.")
+        return render(
+            request,
+            "admin/redefinir_senha.html",
+            status_code=400,
+            usuario=user,
+            erro="A senha deve ter pelo menos oito caracteres, não pode ser vazia e não pode ser igual ao login.",
+        )
     if new_password != confirm_password:
-        raise HTTPException(status_code=400, detail="A confirmação da senha não corresponde.")
+        return render(
+            request,
+            "admin/redefinir_senha.html",
+            status_code=400,
+            usuario=user,
+            erro="A confirmação da senha não corresponde.",
+        )
     user.password_hash = hash_password(new_password)
     user.must_change_password = True
     user.session_version += 1

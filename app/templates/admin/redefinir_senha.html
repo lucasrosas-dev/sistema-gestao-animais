@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Redefinir senha{% endblock %}
+{% block breadcrumb_items %}<span>›</span><a href="/admin/usuarios">Usuários</a><span>›</span><span>Redefinir senha</span>{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Redefinir senha</h1><p>Defina uma nova senha temporária para <strong>{{ usuario.display_name }}</strong> ({{ usuario.username }}).</p></div></div>
+{% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
+<form class="card form-card prevent-double-submit" method="post" action="/admin/usuarios/{{ usuario.id }}/redefinir-senha" data-confirm="Redefinir a senha e exigir alteração no próximo acesso?">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<section class="form-section"><div class="form-grid">
+<label>Nova senha *<input type="password" name="new_password" minlength="8" required autocomplete="new-password" autofocus></label>
+<label>Confirmar senha *<input type="password" name="confirm_password" minlength="8" required autocomplete="new-password"></label>
+</div></section>
+<p class="form-help">Após a redefinição, todas as sessões desse usuário serão encerradas e ele deverá escolher outra senha no próximo acesso.</p>
+<div class="form-actions"><a class="button ghost" href="/admin/usuarios">Cancelar</a><button class="button" type="submit">Redefinir senha</button></div>
+</form>
+{% endblock %}

@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from app.database import SessionLocal
-from app.models import User
+from app.models import AuditLog, User
 from app.security import hash_password, verify_password
 from conftest import hidden, login
 
@@ -92,3 +92,91 @@ def test_security_headers(client):
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["x-frame-options"] == "DENY"
     assert "frame-ancestors" in response.headers["content-security-policy"]
+
+
+def test_admin_can_reset_user_password_from_form(client):
+    with SessionLocal() as db:
+        user = User(
+            username="taty",
+            name="Taty",
+            role="Operador",
+            password_hash=hash_password("senha-antiga-123"),
+            is_active=True,
+            must_change_password=False,
+            session_version=1,
+        )
+        db.add(user)
+        db.commit()
+        user_id = user.id
+
+    assert login(client).status_code == 303
+    listing = client.get("/admin/usuarios")
+    reset_path = f"/admin/usuarios/{user_id}/redefinir-senha"
+    assert listing.status_code == 200
+    assert f'href="{reset_path}"' in listing.text
+
+    page = client.get(reset_path)
+    assert page.status_code == 200
+    assert 'name="new_password"' in page.text
+    assert 'name="confirm_password"' in page.text
+
+    response = client.post(
+        reset_path,
+        data={
+            "new_password": "nova-senha-123",
+            "confirm_password": "nova-senha-123",
+            "csrf_token": hidden(page.text, "csrf_token"),
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin/usuarios"
+
+    with SessionLocal() as db:
+        updated = db.get(User, user_id)
+        assert verify_password("nova-senha-123", updated.password_hash)
+        assert updated.must_change_password is True
+        assert updated.session_version == 2
+        audit = db.scalar(
+            select(AuditLog).where(
+                AuditLog.entidade == "usuário",
+                AuditLog.registro_id == str(user_id),
+                AuditLog.operacao == "redefinição de senha",
+            )
+        )
+        assert audit is not None
+
+
+def test_reset_password_form_shows_validation_error(client):
+    with SessionLocal() as db:
+        user = User(
+            username="operador",
+            name="Operador",
+            role="Operador",
+            password_hash=hash_password("senha-antiga-123"),
+            is_active=True,
+            must_change_password=False,
+            session_version=1,
+        )
+        db.add(user)
+        db.commit()
+        user_id = user.id
+
+    login(client)
+    reset_path = f"/admin/usuarios/{user_id}/redefinir-senha"
+    page = client.get(reset_path)
+    response = client.post(
+        reset_path,
+        data={
+            "new_password": "nova-senha-123",
+            "confirm_password": "senha-diferente-123",
+            "csrf_token": hidden(page.text, "csrf_token"),
+        },
+    )
+    assert response.status_code == 400
+    assert "confirmação da senha não corresponde" in response.text
+
+    with SessionLocal() as db:
+        unchanged = db.get(User, user_id)
+        assert verify_password("senha-antiga-123", unchanged.password_hash)
+        assert unchanged.session_version == 1
