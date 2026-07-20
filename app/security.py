@@ -82,6 +82,16 @@ class AuthGateMiddleware(BaseHTTPMiddleware):
         ):
             return RedirectResponse("/conta/senha", status_code=303)
 
+        # Links administrativos podem permanecer no histórico ou nos favoritos do
+        # navegador depois que um usuário troca a senha. Para perfis operacionais,
+        # uma navegação GET antiga deve voltar ao painel em vez de terminar em 403.
+        if (
+            request.method == "GET"
+            and request.session.get("role") in {"Operador", "Consulta"}
+            and (path == "/admin" or path.startswith("/admin/"))
+        ):
+            return RedirectResponse("/painel", status_code=303)
+
         return await call_next(request)
 
 

@@ -38,6 +38,7 @@ def test_invalid_and_missing_csrf_are_friendly(client):
     response = client.post("/animais/novo", data={"codigo": "X", "sexo": "Fêmea"})
     assert response.status_code == 403
     assert "Acesso negado" in response.text
+    assert "validação de segurança" in response.text
     assert "traceback" not in response.text.lower()
 
 
@@ -132,6 +133,23 @@ def test_operator_is_redirected_to_dashboard_after_forced_password_change(client
     dashboard = client.get("/painel")
     assert dashboard.status_code == 200
     assert "Acesso negado" not in dashboard.text
+
+    stale_admin_page = client.get("/admin/usuarios", follow_redirects=False)
+    assert stale_admin_page.status_code == 303
+    assert stale_admin_page.headers["location"] == "/painel"
+
+    stale_admin_redirect = client.get("/admin/usuarios")
+    assert stale_admin_redirect.status_code == 200
+    assert "Painel gerencial" in stale_admin_redirect.text
+
+    csrf_token = hidden(dashboard.text, "csrf_token")
+    forbidden_post = client.post(
+        "/admin/backup",
+        data={"csrf_token": csrf_token},
+        follow_redirects=False,
+    )
+    assert forbidden_post.status_code == 403
+    assert "Seu perfil não possui permissão" in forbidden_post.text
 
 
 def test_password_policy_rejects_login_as_password(client):

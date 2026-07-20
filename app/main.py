@@ -106,6 +106,15 @@ async def validation_error(request: Request, exc: RequestValidationError):
 async def http_error(request: Request, exc: StarletteHTTPException):
     if request.url.path in {"/health", "/ready"}:
         return JSONResponse(status_code=exc.status_code, content={"status": "error"})
+    logger.warning(
+        "HTTP %s em %s %s (usuario=%s, perfil=%s, detalhe=%s)",
+        exc.status_code,
+        request.method,
+        request.url.path,
+        request.session.get("username"),
+        request.session.get("role"),
+        exc.detail,
+    )
     titles = {400: "Operação inválida", 401: "Sessão inválida", 403: "Acesso negado", 404: "Página não encontrada", 405: "Operação não permitida", 422: "Dados inválidos", 429: "Muitas tentativas"}
     messages = {
         400: "A solicitação não pôde ser concluída.", 401: "Sua sessão expirou. Entre novamente.",
@@ -113,7 +122,10 @@ async def http_error(request: Request, exc: StarletteHTTPException):
         405: "O método utilizado não é permitido nesta página.", 422: "Revise os dados informados e tente novamente.",
         429: "O limite de tentativas foi atingido. Aguarde antes de tentar novamente.",
     }
-    return render_error(request, exc.status_code, titles.get(exc.status_code, "Erro"), messages.get(exc.status_code, "Não foi possível concluir a solicitação."))
+    message = messages.get(exc.status_code, "Não foi possível concluir a solicitação.")
+    if exc.status_code == 403 and isinstance(exc.detail, str):
+        message = exc.detail
+    return render_error(request, exc.status_code, titles.get(exc.status_code, "Erro"), message)
 
 
 @app.exception_handler(SQLAlchemyError)
