@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from calendar import month_name
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
@@ -25,11 +25,20 @@ def dashboard_metrics(db: Session, period: Period, regime: str, compare: bool = 
     summary = financial_summary(db, period, regime)
     animal_date = Animal.data_aquisicao
     animal_added_conditions = date_filter(animal_date, period)
-    animals_active = int(db.scalar(select(func.count(Animal.id)).where(Animal.status == "Ativo")) or 0)
-    animals_in_production = int(db.scalar(select(func.count(func.distinct(Producao.animal_id))).where(*date_filter(Producao.data_registro, period))) or 0)
-    added = int(db.scalar(select(func.count(Animal.id)).where(*animal_added_conditions)) or 0)
-    sold = int(db.scalar(select(func.count(MovimentacaoAnimal.id)).where(MovimentacaoAnimal.tipo == "Venda", *date_filter(MovimentacaoAnimal.data, period))) or 0)
-    deceased = int(db.scalar(select(func.count(MovimentacaoAnimal.id)).where(MovimentacaoAnimal.tipo == "Falecimento", *date_filter(MovimentacaoAnimal.data, period))) or 0)
+    active_count = func.count(Animal.id).filter(Animal.status == "Ativo")
+    added_count = func.count(Animal.id)
+    if animal_added_conditions:
+        added_count = added_count.filter(*animal_added_conditions)
+    animals_active, added = db.execute(select(active_count, added_count)).one()
+    movement_conditions = date_filter(MovimentacaoAnimal.data, period)
+    sold_count = func.count(MovimentacaoAnimal.id).filter(MovimentacaoAnimal.tipo == "Venda", *movement_conditions)
+    deceased_count = func.count(MovimentacaoAnimal.id).filter(MovimentacaoAnimal.tipo == "Falecimento", *movement_conditions)
+    sold, deceased = db.execute(select(sold_count, deceased_count)).one()
+    animals_active = int(animals_active or 0)
+    animals_in_production = int(summary["animals_in_production"] or 0)
+    added = int(added or 0)
+    sold = int(sold or 0)
+    deceased = int(deceased or 0)
     days = ((period.end - period.start).days + 1) if period.start and period.end else None
     summary.update({
         "animals_active": animals_active,
@@ -58,14 +67,123 @@ def dashboard_metrics(db: Session, period: Period, regime: str, compare: bool = 
 
 
 def monthly_report(db: Session, year: int, regime: str = "competencia") -> list[dict[str, Any]]:
+    start = date(year, 1, 1)
+    end = date(year + 1, 1, 1)
+
+    production_month = func.extract("month", Producao.data_registro)
+    production_rows = db.execute(
+        select(
+            production_month,
+            func.coalesce(func.sum(Producao.quantidade_litros), 0),
+            func.count(Producao.id),
+            func.count(func.distinct(Producao.animal_id)),
+        )
+        .where(Producao.data_registro >= start, Producao.data_registro < end)
+        .group_by(production_month)
+    ).all()
+    production_by_month = {
+        int(row[0]): {
+            "production_total": Decimal(row[1] or 0),
+            "entries": int(row[2] or 0),
+            "animals_in_production": int(row[3] or 0),
+        }
+        for row in production_rows
+    }
+
+    revenue_date = Receita.data_recebimento if regime == "caixa" else Receita.data_competencia
+    revenue_month = func.extract("month", revenue_date)
+    revenue_conditions = (
+        [Receita.situacao == "Recebido", Receita.data_recebimento.is_not(None)]
+        if regime == "caixa"
+        else [Receita.situacao != "Cancelado"]
+    )
+    revenue_rows = db.execute(
+        select(
+            revenue_month,
+            func.coalesce(func.sum(Receita.valor_total), 0),
+            func.coalesce(func.sum(case((Receita.categoria == "Venda de leite", Receita.valor_total), else_=0)), 0),
+            func.coalesce(func.sum(case((Receita.categoria == "Venda de leite", Receita.quantidade), else_=0)), 0),
+        )
+        .where(*revenue_conditions, revenue_date >= start, revenue_date < end)
+        .group_by(revenue_month)
+    ).all()
+    revenue_by_month = {
+        int(row[0]): {
+            "revenue_total": Decimal(row[1] or 0),
+            "milk_revenue": Decimal(row[2] or 0),
+            "liters_sold": Decimal(row[3] or 0),
+        }
+        for row in revenue_rows
+    }
+
+    cost_date = Custo.data_pagamento if regime == "caixa" else Custo.data_competencia
+    cost_month = func.extract("month", cost_date)
+    cost_conditions = (
+        [Custo.situacao == "Pago", Custo.data_pagamento.is_not(None)]
+        if regime == "caixa"
+        else [Custo.situacao != "Cancelado"]
+    )
+    cost_rows = db.execute(
+        select(
+            cost_month,
+            func.coalesce(func.sum(Custo.valor_total), 0),
+            func.coalesce(func.sum(case((Custo.tipo_apropriacao == "Custo direto de animal", Custo.valor_total), else_=0)), 0),
+            func.coalesce(func.sum(case((Custo.tipo_apropriacao == "Custo de grupo de animais", Custo.valor_total), else_=0)), 0),
+            func.coalesce(func.sum(case((Custo.tipo_apropriacao == "Custo geral do rebanho", Custo.valor_total), else_=0)), 0),
+            func.coalesce(func.sum(case((Custo.tipo_apropriacao == "Custo não apropriado", Custo.valor_total), else_=0)), 0),
+        )
+        .where(*cost_conditions, cost_date >= start, cost_date < end)
+        .group_by(cost_month)
+    ).all()
+    cost_by_month = {
+        int(row[0]): {
+            "cost_total": Decimal(row[1] or 0),
+            "direct_cost": Decimal(row[2] or 0),
+            "allocated_cost": Decimal(row[3] or 0),
+            "general_cost": Decimal(row[4] or 0),
+            "unappropriated_cost": Decimal(row[5] or 0),
+        }
+        for row in cost_rows
+    }
+
     rows: list[dict[str, Any]] = []
     for month in range(1, 13):
-        start = date(year, month, 1)
-        end = date(year + 1, 1, 1) - timedelta(days=1) if month == 12 else date(year, month + 1, 1) - timedelta(days=1)
-        period = Period(start, end, f"{MONTHS_PT[month]}/{year}")
-        item = dashboard_metrics(db, period, regime, False)
-        item.update({"month": month, "month_name": MONTHS_PT[month], "year": year})
-        rows.append(item)
+        production = production_by_month.get(month, {})
+        revenue = revenue_by_month.get(month, {})
+        costs = cost_by_month.get(month, {})
+        production_total = Decimal(production.get("production_total", 0))
+        entries = int(production.get("entries", 0))
+        animals_in_production = int(production.get("animals_in_production", 0))
+        revenue_total = Decimal(revenue.get("revenue_total", 0))
+        milk_revenue = Decimal(revenue.get("milk_revenue", 0))
+        liters_sold = Decimal(revenue.get("liters_sold", 0))
+        cost_total = Decimal(costs.get("cost_total", 0))
+        result = revenue_total - cost_total
+        cost_per_liter = cost_total / production_total if production_total else None
+        revenue_per_liter_sold = milk_revenue / liters_sold if liters_sold else None
+        rows.append({
+            "month": month,
+            "month_name": MONTHS_PT[month],
+            "year": year,
+            "production_total": production_total,
+            "entries": entries,
+            "animals_in_production": animals_in_production,
+            "average_production": production_total / entries if entries else None,
+            "revenue_total": money(revenue_total),
+            "cost_total": money(cost_total),
+            "result": money(result),
+            "margin": result / revenue_total * 100 if revenue_total else None,
+            "milk_revenue": money(milk_revenue),
+            "liters_sold": liters_sold,
+            "production_sales_difference": production_total - liters_sold,
+            "direct_cost": money(Decimal(costs.get("direct_cost", 0))),
+            "allocated_cost": money(Decimal(costs.get("allocated_cost", 0))),
+            "general_cost": money(Decimal(costs.get("general_cost", 0))),
+            "unappropriated_cost": money(Decimal(costs.get("unappropriated_cost", 0))),
+            "cost_per_liter": cost_per_liter,
+            "revenue_per_liter_sold": revenue_per_liter_sold,
+            "result_per_liter": revenue_per_liter_sold - cost_per_liter if revenue_per_liter_sold is not None and cost_per_liter is not None else None,
+        })
     return rows
 
 

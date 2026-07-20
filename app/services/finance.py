@@ -133,24 +133,43 @@ def apply_allocations(custo: Custo, allocations: list[dict]) -> None:
         custo.rateios.append(RateioCusto(**item))
 
 
+def _filtered(aggregate, conditions):
+    return aggregate.filter(*conditions) if conditions else aggregate
+
+
 def financial_summary(db: Session, period: Period, regime: str = "competencia") -> dict[str, Decimal | int | None]:
     cost_conditions = active_cost_conditions(regime, period)
     revenue_conditions = active_revenue_conditions(regime, period)
     production_conditions = date_filter(Producao.data_registro, period)
+    pending_revenue_conditions = [Receita.situacao == "Pendente", *date_filter(Receita.data_competencia, period)]
+    pending_cost_conditions = [Custo.situacao == "Pendente", *date_filter(Custo.data_competencia, period)]
 
-    revenue_total = Decimal(db.scalar(select(func.coalesce(func.sum(Receita.valor_total), 0)).where(*revenue_conditions)) or 0)
-    cost_total = Decimal(db.scalar(select(func.coalesce(func.sum(Custo.valor_total), 0)).where(*cost_conditions)) or 0)
-    production_total = Decimal(db.scalar(select(func.coalesce(func.sum(Producao.quantidade_litros), 0)).where(*production_conditions)) or 0)
-    entries = int(db.scalar(select(func.count(Producao.id)).where(*production_conditions)) or 0)
-    milk_revenue = Decimal(db.scalar(select(func.coalesce(func.sum(Receita.valor_total), 0)).where(*revenue_conditions, Receita.categoria == "Venda de leite")) or 0)
-    liters_sold = Decimal(db.scalar(select(func.coalesce(func.sum(Receita.quantidade), 0)).where(*revenue_conditions, Receita.categoria == "Venda de leite")) or 0)
-    pending_revenue = Decimal(db.scalar(select(func.coalesce(func.sum(Receita.valor_total), 0)).where(Receita.situacao == "Pendente", *date_filter(Receita.data_competencia, period))) or 0)
-    pending_cost = Decimal(db.scalar(select(func.coalesce(func.sum(Custo.valor_total), 0)).where(Custo.situacao == "Pendente", *date_filter(Custo.data_competencia, period))) or 0)
+    revenue_row = db.execute(select(
+        func.coalesce(_filtered(func.sum(Receita.valor_total), revenue_conditions), 0),
+        func.coalesce(_filtered(func.sum(Receita.valor_total), [*revenue_conditions, Receita.categoria == "Venda de leite"]), 0),
+        func.coalesce(_filtered(func.sum(Receita.quantidade), [*revenue_conditions, Receita.categoria == "Venda de leite"]), 0),
+        func.coalesce(_filtered(func.sum(Receita.valor_total), pending_revenue_conditions), 0),
+    )).one()
+    revenue_total, milk_revenue, liters_sold, pending_revenue = (Decimal(value or 0) for value in revenue_row)
 
-    direct_cost = Decimal(db.scalar(select(func.coalesce(func.sum(Custo.valor_total), 0)).where(*cost_conditions, Custo.tipo_apropriacao == "Custo direto de animal")) or 0)
-    general_cost = Decimal(db.scalar(select(func.coalesce(func.sum(Custo.valor_total), 0)).where(*cost_conditions, Custo.tipo_apropriacao == "Custo geral do rebanho")) or 0)
-    unappropriated_cost = Decimal(db.scalar(select(func.coalesce(func.sum(Custo.valor_total), 0)).where(*cost_conditions, Custo.tipo_apropriacao == "Custo não apropriado")) or 0)
-    group_cost = Decimal(db.scalar(select(func.coalesce(func.sum(Custo.valor_total), 0)).where(*cost_conditions, Custo.tipo_apropriacao == "Custo de grupo de animais")) or 0)
+    cost_row = db.execute(select(
+        func.coalesce(_filtered(func.sum(Custo.valor_total), cost_conditions), 0),
+        func.coalesce(_filtered(func.sum(Custo.valor_total), pending_cost_conditions), 0),
+        func.coalesce(_filtered(func.sum(Custo.valor_total), [*cost_conditions, Custo.tipo_apropriacao == "Custo direto de animal"]), 0),
+        func.coalesce(_filtered(func.sum(Custo.valor_total), [*cost_conditions, Custo.tipo_apropriacao == "Custo geral do rebanho"]), 0),
+        func.coalesce(_filtered(func.sum(Custo.valor_total), [*cost_conditions, Custo.tipo_apropriacao == "Custo não apropriado"]), 0),
+        func.coalesce(_filtered(func.sum(Custo.valor_total), [*cost_conditions, Custo.tipo_apropriacao == "Custo de grupo de animais"]), 0),
+    )).one()
+    cost_total, pending_cost, direct_cost, general_cost, unappropriated_cost, group_cost = (Decimal(value or 0) for value in cost_row)
+
+    production_row = db.execute(select(
+        func.coalesce(_filtered(func.sum(Producao.quantidade_litros), production_conditions), 0),
+        _filtered(func.count(Producao.id), production_conditions),
+        _filtered(func.count(func.distinct(Producao.animal_id)), production_conditions),
+    )).one()
+    production_total = Decimal(production_row[0] or 0)
+    entries = int(production_row[1] or 0)
+    animals_in_production = int(production_row[2] or 0)
 
     result = revenue_total - cost_total
     margin = result / revenue_total * 100 if revenue_total else None
@@ -162,6 +181,7 @@ def financial_summary(db: Session, period: Period, regime: str = "competencia") 
     return {
         "revenue_total": money(revenue_total), "cost_total": money(cost_total), "result": money(result),
         "margin": margin, "production_total": production_total, "entries": entries,
+        "animals_in_production": animals_in_production,
         "average_production": average_production, "milk_revenue": money(milk_revenue),
         "liters_sold": liters_sold, "production_sales_difference": production_total - liters_sold,
         "pending_revenue": money(pending_revenue), "pending_cost": money(pending_cost),
