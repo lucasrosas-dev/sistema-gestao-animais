@@ -5,7 +5,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import case, func, select
+from sqlalchemy import Numeric, case, cast, func, literal, select, true
 from sqlalchemy.orm import Session
 
 from ..models import Animal, Custo, EventoAnimal, MovimentacaoAnimal, Producao, RateioCusto, Receita
@@ -29,11 +29,15 @@ def dashboard_metrics(db: Session, period: Period, regime: str, compare: bool = 
     added_count = func.count(Animal.id)
     if animal_added_conditions:
         added_count = added_count.filter(*animal_added_conditions)
-    animals_active, added = db.execute(select(active_count, added_count)).one()
+    animal_summary = select(active_count, added_count).subquery()
     movement_conditions = date_filter(MovimentacaoAnimal.data, period)
     sold_count = func.count(MovimentacaoAnimal.id).filter(MovimentacaoAnimal.tipo == "Venda", *movement_conditions)
     deceased_count = func.count(MovimentacaoAnimal.id).filter(MovimentacaoAnimal.tipo == "Falecimento", *movement_conditions)
-    sold, deceased = db.execute(select(sold_count, deceased_count)).one()
+    movement_summary = select(sold_count, deceased_count).subquery()
+    animals_active, added, sold, deceased = db.execute(
+        select(*animal_summary.c, *movement_summary.c)
+        .select_from(animal_summary.join(movement_summary, true()))
+    ).one()
     animals_active = int(animals_active or 0)
     animals_in_production = int(summary["animals_in_production"] or 0)
     added = int(added or 0)
@@ -71,24 +75,20 @@ def monthly_report(db: Session, year: int, regime: str = "competencia") -> list[
     end = date(year + 1, 1, 1)
 
     production_month = func.extract("month", Producao.data_registro)
-    production_rows = db.execute(
+    zero = cast(literal(0), Numeric)
+    production_query = (
         select(
+            literal("production"),
             production_month,
             func.coalesce(func.sum(Producao.quantidade_litros), 0),
-            func.count(Producao.id),
-            func.count(func.distinct(Producao.animal_id)),
+            cast(func.count(Producao.id), Numeric),
+            cast(func.count(func.distinct(Producao.animal_id)), Numeric),
+            zero,
+            zero,
         )
         .where(Producao.data_registro >= start, Producao.data_registro < end)
         .group_by(production_month)
-    ).all()
-    production_by_month = {
-        int(row[0]): {
-            "production_total": Decimal(row[1] or 0),
-            "entries": int(row[2] or 0),
-            "animals_in_production": int(row[3] or 0),
-        }
-        for row in production_rows
-    }
+    )
 
     revenue_date = Receita.data_recebimento if regime == "caixa" else Receita.data_competencia
     revenue_month = func.extract("month", revenue_date)
@@ -97,24 +97,19 @@ def monthly_report(db: Session, year: int, regime: str = "competencia") -> list[
         if regime == "caixa"
         else [Receita.situacao != "Cancelado"]
     )
-    revenue_rows = db.execute(
+    revenue_query = (
         select(
+            literal("revenue"),
             revenue_month,
             func.coalesce(func.sum(Receita.valor_total), 0),
             func.coalesce(func.sum(case((Receita.categoria == "Venda de leite", Receita.valor_total), else_=0)), 0),
             func.coalesce(func.sum(case((Receita.categoria == "Venda de leite", Receita.quantidade), else_=0)), 0),
+            zero,
+            zero,
         )
         .where(*revenue_conditions, revenue_date >= start, revenue_date < end)
         .group_by(revenue_month)
-    ).all()
-    revenue_by_month = {
-        int(row[0]): {
-            "revenue_total": Decimal(row[1] or 0),
-            "milk_revenue": Decimal(row[2] or 0),
-            "liters_sold": Decimal(row[3] or 0),
-        }
-        for row in revenue_rows
-    }
+    )
 
     cost_date = Custo.data_pagamento if regime == "caixa" else Custo.data_competencia
     cost_month = func.extract("month", cost_date)
@@ -123,8 +118,9 @@ def monthly_report(db: Session, year: int, regime: str = "competencia") -> list[
         if regime == "caixa"
         else [Custo.situacao != "Cancelado"]
     )
-    cost_rows = db.execute(
+    cost_query = (
         select(
+            literal("cost"),
             cost_month,
             func.coalesce(func.sum(Custo.valor_total), 0),
             func.coalesce(func.sum(case((Custo.tipo_apropriacao == "Custo direto de animal", Custo.valor_total), else_=0)), 0),
@@ -134,17 +130,33 @@ def monthly_report(db: Session, year: int, regime: str = "competencia") -> list[
         )
         .where(*cost_conditions, cost_date >= start, cost_date < end)
         .group_by(cost_month)
-    ).all()
-    cost_by_month = {
-        int(row[0]): {
-            "cost_total": Decimal(row[1] or 0),
-            "direct_cost": Decimal(row[2] or 0),
-            "allocated_cost": Decimal(row[3] or 0),
-            "general_cost": Decimal(row[4] or 0),
-            "unappropriated_cost": Decimal(row[5] or 0),
-        }
-        for row in cost_rows
-    }
+    )
+
+    production_by_month: dict[int, dict[str, Decimal | int]] = {}
+    revenue_by_month: dict[int, dict[str, Decimal]] = {}
+    cost_by_month: dict[int, dict[str, Decimal]] = {}
+    for row in db.execute(production_query.union_all(revenue_query, cost_query)).all():
+        kind, month = row[0], int(row[1])
+        if kind == "production":
+            production_by_month[month] = {
+                "production_total": Decimal(row[2] or 0),
+                "entries": int(row[3] or 0),
+                "animals_in_production": int(row[4] or 0),
+            }
+        elif kind == "revenue":
+            revenue_by_month[month] = {
+                "revenue_total": Decimal(row[2] or 0),
+                "milk_revenue": Decimal(row[3] or 0),
+                "liters_sold": Decimal(row[4] or 0),
+            }
+        else:
+            cost_by_month[month] = {
+                "cost_total": Decimal(row[2] or 0),
+                "direct_cost": Decimal(row[3] or 0),
+                "allocated_cost": Decimal(row[4] or 0),
+                "general_cost": Decimal(row[5] or 0),
+                "unappropriated_cost": Decimal(row[6] or 0),
+            }
 
     rows: list[dict[str, Any]] = []
     for month in range(1, 13):

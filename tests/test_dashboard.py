@@ -139,4 +139,4 @@ def test_panel_query_count_stays_bounded(client):
 
     assert response.status_code == 200
     assert "Painel gerencial" in response.text
-    assert len(statements) <= 15
+    assert len(statements) <= 8
